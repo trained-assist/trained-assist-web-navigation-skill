@@ -9,3 +9,9 @@ Provides the `web_*` methods ported from legacy `src/web-ops.js`
 
 Runtime: Playwright Chromium. Credentials are read from the profile credential
 store and never returned to the model.
+
+## Host provider adapter
+
+`src/host-provider.js` exposes `createHostProvider({ version })` for
+`trained-assist-mcp-host`; `version` must be the pinned 40-character source commit.
+It adapts all `web_*` handlers with `run.signal` / `run.profileId` context.
