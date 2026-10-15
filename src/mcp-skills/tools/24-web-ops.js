@@ -38,6 +38,25 @@ const tools = {
     },
   },
 
+  web_open_resilient: {
+    description:
+      'Открыть страницу с автопроходом Cloudflare/JS-challenge: web_open + challenge snapshot + web_pass_challenge (headed/stealth + OCR/human-like) + повторное чтение. ' +
+      'Возвращает challenge/challengePassed, стратегию и состояние страницы. Если challenge не прошёл — stateSnapshot с полным снимком.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string' },
+        max_chars: { type: 'number' },
+        attempts: { type: 'number' },
+      },
+      required: ['url'],
+    },
+    handler: async ({ url, max_chars, attempts } = {}) => {
+      try { return await ops.openResilient(url, { maxChars: Number(max_chars) || undefined, attempts: Number(attempts) || 2 }); }
+      catch (e) { return fail('web_open_resilient', e); }
+    },
+  },
+
   web_text: {
     description:
       'Прочитать ПРОДОЛЖЕНИЕ уже открытой страницы: вернуть кусок её текста по смещению, ' +
