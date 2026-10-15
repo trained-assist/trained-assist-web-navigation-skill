@@ -60,6 +60,8 @@ function isChallenge(title, text) {
       const y = word ? Math.round((word.y1 + word.y2) / 2) : 320;
       click = { x, y, source: word ? 'ocr' : 'default', word: word ? word.text : null };
       await page.mouse.click(x, y);
+      await page.waitForTimeout(10000);
+      await page.mouse.click(x - 26, y);
       await page.waitForTimeout(6000);
     }
     const afterPath = `/tmp/lo/after-${tag}.png`;
