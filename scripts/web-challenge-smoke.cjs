@@ -2,6 +2,7 @@
 const { chromium } = require('playwright');
 const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
+const ops = require('../src/web-ops');
 
 const urls = (process.env.URLS || 'https://chatgpt.com')
   .split(',')
@@ -50,10 +51,11 @@ function isChallenge(title, text) {
     const challengeBefore = isChallenge(titleBefore, beforeOcr);
     let click = null;
     if (challengeBefore) {
-      const m = beforeHocr.match(/title="bbox\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)"[^>]*>([^<]*[Vv]erif[^<]*)</);
-      const x = m ? Math.max(10, Number(m[1]) - 10) : 160;
-      const y = m ? Math.round((Number(m[2]) + Number(m[4])) / 2) : 320;
-      click = { x, y, source: m ? 'ocr' : 'default' };
+      const words = ops.parseHocrWords(beforeHocr);
+      const word = ops.findChallengeWord(words);
+      const x = word ? Math.max(10, Math.round(word.x1 - Math.max(24, (word.x2 - word.x1) * 0.32))) : 160;
+      const y = word ? Math.round((word.y1 + word.y2) / 2) : 320;
+      click = { x, y, source: word ? 'ocr' : 'default', word: word ? word.text : null };
       await page.mouse.click(x, y);
       await page.waitForTimeout(6000);
     }

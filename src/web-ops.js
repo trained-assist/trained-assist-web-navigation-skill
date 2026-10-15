@@ -1153,6 +1153,7 @@ module.exports = {
   statePath,
   shotsDir,
   // internals kept for tests
+  parseHocrWords,
   isCloudflareChallenge,
   findChallengeWord,
   runTesseractHocr,
