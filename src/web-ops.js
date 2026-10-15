@@ -307,10 +307,13 @@ async function closeSession() {
   try { await s.browser.close(); } catch { /* ignore */ }
 }
 
-async function openSession() {
+async function openSession(options = {}) {
   if (session) { touch(); return session; }
+  const headless = Object.prototype.hasOwnProperty.call(options, 'headless')
+    ? Boolean(options.headless)
+    : !process.env.WEB_OPS_HEADED;
   const { chromium } = require('playwright');
-  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
+  const browser = await chromium.launch({ headless, args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-blink-features=AutomationControlled'] });
   const storageState = readableState();
   const context = await browser.newContext({
     viewport: VIEWPORT,
@@ -983,9 +986,10 @@ function findChallengeWord(words) {
 function lettersOnly(word) { return String(word && word.text || '').replace(/[^A-Za-z]/g, ''); }
 function wordsWordText(words) { return (words.map(w => w.text).join(' ') || ''); }
 
-async function runChallengeAttempt() {
+async function runChallengeAttempt(headed = false) {
   await saveState();
-  const s = session ? session : await openSession();
+  if (headed) { await closeSession().catch(() => {}); }
+  const s = session ? session : await openSession({ headless: !headed });
   const page = s.page;
   await page.waitForTimeout(4000);
   const screenshotPath = shotsDir()
@@ -1039,11 +1043,11 @@ async function runChallengeAttempt() {
   };
 }
 
-async function passChallenge({ attempts = 2 } = {}) {
+async function passChallenge({ attempts = 2, headed = false } = {}) {
   const maxAttempts = Math.max(1, Math.min(Number(attempts) || 2, 3));
   let last = null;
   for (let i = 0; i < maxAttempts; i += 1) {
-    last = await runChallengeAttempt();
+    last = await runChallengeAttempt(headed);
     if (last.ok || !last.challenge) break;
     await new Promise(r => setTimeout(r, 2000));
   }

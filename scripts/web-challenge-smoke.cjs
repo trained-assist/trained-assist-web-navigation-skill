@@ -30,10 +30,12 @@ function isChallenge(title, text) {
 }
 
 (async () => {
-  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
+  const headed = process.env.HEADED === '1';
+  const browser = await chromium.launch({ headless: !headed, args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-blink-features=AutomationControlled'] });
   const results = [];
   for (const url of urls) {
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  await page.addInitScript(() => { Object.defineProperty(navigator, 'webdriver', { get: () => undefined }); });
     let status = null;
     try {
       const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
