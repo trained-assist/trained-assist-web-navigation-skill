@@ -978,13 +978,31 @@ function isCloudflareChallenge(hocrText) {
 }
 
 function findChallengeWord(words) {
-  return words.find(word => /^ver[a-z]{3,}$/i.test(lettersOnly(word)))
-    || words.find(word => /verif/i.test(lettersOnly(word)))
+  return words.find(word => /^verify$/i.test(lettersOnly(word)))
+    || words.find(word => /verify/i.test(lettersOnly(word)))
     || null;
 }
 
 function lettersOnly(word) { return String(word && word.text || '').replace(/[^A-Za-z]/g, ''); }
 function wordsWordText(words) { return (words.map(w => w.text).join(' ') || ''); }
+
+async function humanLikeClick(page, x, y) {
+  const steps = 28 + Math.floor(Math.random() * 18);
+  const startX = 40 + Math.floor(Math.random() * 120);
+  const startY = 80 + Math.floor(Math.random() * 120);
+  for (let i = 1; i <= steps; i += 1) {
+    const t = i / steps;
+    const eased = 1 - Math.pow(1 - t, 3);
+    const jx = (Math.random() - 0.5) * 6;
+    const jy = (Math.random() - 0.5) * 6;
+    const mx = Math.round(startX + (x - startX) * eased + jx);
+    const my = Math.round(startY + (y - startY) * eased + jy);
+    await page.mouse.move(mx, my);
+    await new Promise(r => setTimeout(r, 12 + Math.floor(Math.random() * 22)));
+  }
+  await page.waitForTimeout(90 + Math.floor(Math.random() * 160));
+  await page.mouse.click(x, y, { delay: 120 + Math.floor(Math.random() * 180) });
+}
 
 async function runChallengeAttempt(headed = false) {
   await saveState();
@@ -1010,8 +1028,8 @@ async function runChallengeAttempt(headed = false) {
   const clickSource = word ? 'ocr' : (ocrAvailable ? 'default' : 'default-no-ocr');
   const x = word ? Math.max(10, Math.round(word.x1 - Math.max(24, (word.x2 - word.x1) * 0.32))) : 160;
   const y = word ? Math.round((word.y1 + word.y2) / 2) : 330;
-  await page.mouse.click(x, y);
-  await page.waitForTimeout(6000);
+  await humanLikeClick(page, x, y);
+  await page.waitForTimeout(7000);
   const afterPath = shotsDir()
     ? path.join(shotsDir(), 'challenge-after.png')
     : path.join(process.cwd(), 'challenge-after.png');
