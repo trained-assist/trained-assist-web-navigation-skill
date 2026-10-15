@@ -23,6 +23,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
 const VIEWPORT = { width: 1280, height: 800 };
 const NAV_TIMEOUT_MS = 30_000;
@@ -933,6 +934,105 @@ async function fetchPageText(url) {
   });
 }
 
+
+function runTesseractHocr(imagePath) {
+  const outputBase = imagePath.endsWith('.png') ? imagePath.replace(/\.png$/i, '') : `${imagePath}.ocr`;
+  try {
+    execFileSync('tesseract', [imagePath, outputBase, '--psm', '6', 'hocr'], {
+      stdio: 'ignore',
+      timeout: 15000,
+    });
+    const text = fs.readFileSync(`${outputBase}.hocr`, 'utf8');
+    return { text, words: parseHocrWords(text) };
+  } catch {
+    return { text: '', words: [] };
+  }
+}
+
+function parseHocrWords(text) {
+  const out = [];
+  for (const m of String(text || '').matchAll(/<span class="ocrx_word"[^>]*title="bbox (\d+) (\d+) (\d+) (\d+)[^"]*" [^>]*>([^<]*)<\/span>/g)) {
+    out.push({
+      x1: Number(m[1]), y1: Number(m[2]), x2: Number(m[3]), y2: Number(m[4]),
+      text: String(m[5] || '').replace(/\s+/g, ' ').trim(),
+    });
+  }
+  return out;
+}
+
+function isCloudflareChallenge(hocrText) {
+  const normalized = String(hocrText || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').toLowerCase();
+  return /cloudflare/.test(normalized) && /(security verification|performing security|verify you are human|verify you’re human|challenge)/.test(normalized);
+}
+
+function findChallengeWord(words) {
+  return words.find(word => /^ver[a-z]{3,}$/i.test(lettersOnly(word)))
+    || words.find(word => /verif/i.test(lettersOnly(word)))
+    || null;
+}
+
+function lettersOnly(word) { return String(word && word.text || '').replace(/[^A-Za-z]/g, ''); }
+function wordsWordText(words) { return (words.map(w => w.text).join(' ') || ''); }
+
+async function runChallengeAttempt() {
+  await saveState();
+  const s = session ? session : await openSession();
+  const page = s.page;
+  await page.waitForTimeout(4000);
+  const screenshotPath = shotsDir()
+    ? path.join(shotsDir(), 'challenge-check.png')
+    : path.join(process.cwd(), 'challenge-check.png');
+  fs.mkdirSync(path.dirname(screenshotPath), { recursive: true });
+  await page.screenshot({ path: screenshotPath, fullPage: false });
+  const before = runTesseractHocr(screenshotPath);
+  try { fs.writeFileSync('/tmp/hocr-before.hocr', before.text || ''); } catch {}
+  const titleBefore = await page.title().catch(() => '');
+  const titleChallenge = /один момент|just a moment|cloudflare|security (check|verification)|attention required/i.test(titleBefore);
+  if (!titleChallenge && !isCloudflareChallenge(before.text)) {
+    const view = await readPage(page, 1500);
+    return { ok: true, challenge: false, url: view.url, title: view.title, text: view.text };
+  }
+  const word = findChallengeWord(before.words);
+  const x = word ? Math.max(10, Math.round(word.x1 - Math.max(24, (word.x2 - word.x1) * 0.32))) : 160;
+  const y = word ? Math.round((word.y1 + word.y2) / 2) : 330;
+  // moved above for fallback
+  await page.mouse.click(x, y);
+  await page.waitForTimeout(6000);
+  const afterPath = shotsDir()
+    ? path.join(shotsDir(), 'challenge-after.png')
+    : path.join(process.cwd(), 'challenge-after.png');
+  await page.screenshot({ path: afterPath, fullPage: false });
+  const after = runTesseractHocr(afterPath);
+  const titleAfter = await page.title().catch(() => '');
+  const titleChallengeAfter = /один момент|just a moment|cloudflare|security (check|verification)|attention required/i.test(titleAfter);
+  const still = titleChallengeAfter || isCloudflareChallenge(after.text);
+  await saveState();
+  const view = await readPage(page, 1500);
+  return {
+    ok: !still,
+    challenge: still,
+    challengePassed: !still,
+    x, y,
+    url: view.url,
+    title: view.title,
+    text: view.text,
+    hint: still ? 'Challenge остался; понадобится ручной headed pass или proxy/stealth.' : 'Challenge пройден.',
+    screenshotBefore: screenshotPath,
+    screenshotAfter: afterPath,
+  };
+}
+
+async function passChallenge({ attempts = 2 } = {}) {
+  const maxAttempts = Math.max(1, Math.min(Number(attempts) || 2, 3));
+  let last = null;
+  for (let i = 0; i < maxAttempts; i += 1) {
+    last = await runChallengeAttempt();
+    if (last.ok || !last.challenge) break;
+    await new Promise(r => setTimeout(r, 2000));
+  }
+  return last;
+}
+
 // ------------------------------------------------------------------ credentials
 
 function credentialsFile(serviceKey) {
@@ -970,6 +1070,7 @@ function readCredentials(serviceKey) {
 }
 
 module.exports = {
+  passChallenge,
   INTERACTIVE_SELECTOR,
   checkUrl,
   cleanText,
