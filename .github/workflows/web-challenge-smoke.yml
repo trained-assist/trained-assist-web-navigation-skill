@@ -1,0 +1,32 @@
+name: web-challenge-smoke
+on:
+  workflow_dispatch:
+    inputs:
+      urls:
+        description: 'Comma-separated URLs to test'
+        required: false
+        default: 'https://pubs.acs.org/aamick/article-abstract/13/30/36380/369809/Biocompatible-Wax-Based-Microcapsules-with?redirectedFrom=fulltext,https://chatgpt.com'
+
+permissions:
+  contents: read
+
+jobs:
+  challenge:
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.52.0-noble
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tesseract
+        run: apt-get update && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng && tesseract --version
+      - name: Install Node deps
+        run: npm ci
+      - name: Run challenge smoke
+        env:
+          URLS: ${{ github.event.inputs.urls }}
+        run: node scripts/web-challenge-smoke.cjs
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-challenge-${{ github.run_id }}
+          path: /tmp/lo/**

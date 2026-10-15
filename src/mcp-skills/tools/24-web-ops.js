@@ -216,9 +216,11 @@ const tools = {
 
   web_pass_challenge: {
     description:
-      'Попробовать пройти Cloudflare JS-challenge на открытой странице: waits 4s, делает screenshot, ' +
-      'находит через OCR слово "Verify" и кликает по координате checkbox. Возвращает challengeStill/challengePassed. ' +
-      'Не решает кастомную капчу, NP challenges возможны; при повторном challenge — перейти на ручной headed pass.',
+       'Попробовать пройти Cloudflare JS-challenge на открытой странице: waits 4s, делает screenshot, ' +
+       'находит через OCR слово "Verify" и кликает по координате checkbox. Возвращает challengeStill/challengePassed, ' +
+       'OCR-строки и click {x,y}. Если OCR недоступен — кликает по типовой координате и корректно отмечает ocrAvailable=false. ' +
+       'HTTP fallback остаётся через web_open + web_text, без выдумывания успеха.' +
+       'Не решает кастомную капчу, NP challenges возможны; при повторном challenge — перейти на ручной headed pass.',
     inputSchema: {
       type: 'object',
       properties: {

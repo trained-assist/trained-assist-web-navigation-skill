@@ -935,6 +935,15 @@ async function fetchPageText(url) {
 }
 
 
+function tesseractAvailable() {
+  try {
+    execFileSync('tesseract', ['--version'], { stdio: 'ignore', timeout: 3000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function runTesseractHocr(imagePath) {
   const outputBase = imagePath.endsWith('.png') ? imagePath.replace(/\.png$/i, '') : `${imagePath}.ocr`;
   try {
@@ -992,10 +1001,11 @@ async function runChallengeAttempt() {
     const view = await readPage(page, 1500);
     return { ok: true, challenge: false, url: view.url, title: view.title, text: view.text };
   }
+  const ocrAvailable = tesseractAvailable();
   const word = findChallengeWord(before.words);
+  const clickSource = word ? 'ocr' : (ocrAvailable ? 'default' : 'default-no-ocr');
   const x = word ? Math.max(10, Math.round(word.x1 - Math.max(24, (word.x2 - word.x1) * 0.32))) : 160;
   const y = word ? Math.round((word.y1 + word.y2) / 2) : 330;
-  // moved above for fallback
   await page.mouse.click(x, y);
   await page.waitForTimeout(6000);
   const afterPath = shotsDir()
@@ -1013,7 +1023,14 @@ async function runChallengeAttempt() {
     challenge: still,
     challengePassed: !still,
     x, y,
+    click: { x, y, source: clickSource, word: word ? (word.text || null) : null },
+    ocrAvailable,
+    ocrBefore: String(before.text || '').slice(0, 3000),
+    ocrAfter: String(after.text || '').slice(0, 3000),
+    ocrWord: word ? (word.text || '') : '',
     url: view.url,
+    titleBefore,
+    titleAfter: view.title,
     title: view.title,
     text: view.text,
     hint: still ? 'Challenge остался; понадобится ручной headed pass или proxy/stealth.' : 'Challenge пройден.',
@@ -1069,8 +1086,31 @@ function readCredentials(serviceKey) {
   return null;
 }
 
+async function httpFallback(url) {
+  const checked = checkUrl(url);
+  if (!checked.ok) return { ok: false, url: String(url || ''), status: null, challenge: false, text: '', error: checked.reason };
+  try {
+    const response = await fetch(checked.url, { redirect: 'follow' });
+    const raw = await response.text();
+    const cleaned = cleanRaw(raw);
+    const challenge = isCloudflareChallenge(raw) || /just a moment|performing security/i.test(cleaned.slice(0, 2000));
+    return {
+      ok: response.ok && !challenge,
+      url: checked.url,
+      status: response.status,
+      contentType: response.headers.get('content-type') || '',
+      challenge,
+      text: cleaned.slice(0, DEFAULT_TEXT_CHARS),
+    };
+  } catch (e) {
+    return { ok: false, url: checked.url, status: null, challenge: false, text: '', error: String((e && e.message) || e).slice(0, 200) };
+  }
+}
+
 module.exports = {
   passChallenge,
+  httpFallback,
+  tesseractAvailable,
   INTERACTIVE_SELECTOR,
   checkUrl,
   cleanText,
@@ -1113,5 +1153,8 @@ module.exports = {
   statePath,
   shotsDir,
   // internals kept for tests
+  isCloudflareChallenge,
+  findChallengeWord,
+  runTesseractHocr,
   _reset() { session = null; lastFind = null; chain = Promise.resolve(); },
 };
