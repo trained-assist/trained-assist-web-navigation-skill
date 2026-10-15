@@ -1020,6 +1020,25 @@ async function runChallengeAttempt(headed = false) {
   const titleAfter = await page.title().catch(() => '');
   const titleChallengeAfter = /один момент|just a moment|cloudflare|security (check|verification)|attention required/i.test(titleAfter);
   const still = titleChallengeAfter || isCloudflareChallenge(after.text);
+  const fullPagePath = shotsDir()
+    ? path.join(shotsDir(), 'challenge-full.png')
+    : path.join(process.cwd(), 'challenge-full.png');
+  try { await page.screenshot({ path: fullPagePath, fullPage: true }); } catch { /* best effort */ }
+  let stateSnapshot;
+  if (still) {
+    const cookies = await page.context().cookies().catch(() => []);
+    const bodyChars = await page.evaluate(() => (document.body && document.body.innerText || '').length).catch(() => 0);
+    const userAgent = await page.evaluate(() => navigator.userAgent).catch(() => '');
+    stateSnapshot = {
+      url: page.url(),
+      title: titleAfter,
+      userAgent,
+      viewport: page.viewportSize(),
+      cookies: cookies.map(c => ({ name: c.name, domain: c.domain, path: c.path, httpOnly: c.httpOnly, secure: c.secure, expires: c.expires, value: '[redacted]' })),
+      bodyChars,
+      screenshotFull: fullPagePath,
+    };
+  }
   await saveState();
   const view = await readPage(page, 1500);
   return {
@@ -1040,6 +1059,8 @@ async function runChallengeAttempt(headed = false) {
     hint: still ? 'Challenge остался; понадобится ручной headed pass или proxy/stealth.' : 'Challenge пройден.',
     screenshotBefore: screenshotPath,
     screenshotAfter: afterPath,
+    screenshotFull: fullPagePath,
+    stateSnapshot,
   };
 }
 
