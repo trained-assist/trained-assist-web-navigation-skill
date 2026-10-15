@@ -6,6 +6,10 @@ on:
         description: 'Comma-separated URLs to test'
         required: false
         default: 'https://pubs.acs.org/aamick/article-abstract/13/30/36380/369809/Biocompatible-Wax-Based-Microcapsules-with?redirectedFrom=fulltext,https://chatgpt.com'
+  pull_request:
+    paths:
+      - 'scripts/web-challenge-smoke.cjs'
+      - '.github/workflows/web-challenge-smoke.yml'
 
 permissions:
   contents: read
