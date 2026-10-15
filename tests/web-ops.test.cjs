@@ -16,9 +16,20 @@ test('parseHocrWords/lettersOnly not required; findChallengeWord exported indire
   // findChallengeWord not exported name; ensure challenge detection path does not crash
   assert.ok(true);
 });
+test('findChallengeWord prefers exact Verify over verification', () => {
+  const ops = require('../src/web-ops');
+  const words = [
+    { x1: 10, y1:10, x2:40, y2:30, text: 'verification' },
+    { x1: 50, y1:10, x2:80, y2:30, text: 'Verify' },
+  ];
+  const w = ops.findChallengeWord(words);
+  assert.equal(w.text, 'Verify');
+});
+
 test('parse single-quote hocr words', () => {
+  const ops = require('../src/web-ops');
   const hocr = "<span class='ocrx_word' id='word_1_2' title='bbox 531 434 565 461; x_wconf 58'>Verify</span>";
-  const words = require('../src/web-ops').parseHocrWords(hocr);
+  const words = ops.parseHocrWords(hocr);
   assert.equal(words.length, 1);
   assert.equal(words[0].text, 'Verify');
   assert.equal(words[0].x1, 531);
