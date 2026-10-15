@@ -960,7 +960,7 @@ function runTesseractHocr(imagePath) {
 
 function parseHocrWords(text) {
   const out = [];
-  for (const m of String(text || '').matchAll(/<span class="ocrx_word"[^>]*title="bbox (\d+) (\d+) (\d+) (\d+)[^"]*" [^>]*>([^<]*)<\/span>/g)) {
+  for (const m of String(text || '').matchAll(/<span class=['"]ocrx_word['"][^>]*title=['"]bbox (\d+) (\d+) (\d+) (\d+)(?:;[^'"]*)?['"][^>]*>([^<]*)<\/span>/g)) {
     out.push({
       x1: Number(m[1]), y1: Number(m[2]), x2: Number(m[3]), y2: Number(m[4]),
       text: String(m[5] || '').replace(/\s+/g, ' ').trim(),

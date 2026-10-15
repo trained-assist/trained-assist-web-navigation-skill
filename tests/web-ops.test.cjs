@@ -16,3 +16,11 @@ test('parseHocrWords/lettersOnly not required; findChallengeWord exported indire
   // findChallengeWord not exported name; ensure challenge detection path does not crash
   assert.ok(true);
 });
+test('parse single-quote hocr words', () => {
+  const hocr = "<span class='ocrx_word' id='word_1_2' title='bbox 531 434 565 461; x_wconf 58'>Verify</span>";
+  const words = require('../src/web-ops').parseHocrWords(hocr);
+  assert.equal(words.length, 1);
+  assert.equal(words[0].text, 'Verify');
+  assert.equal(words[0].x1, 531);
+  assert.equal(words[0].x2, 565);
+});
