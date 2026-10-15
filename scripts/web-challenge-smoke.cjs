@@ -53,8 +53,7 @@ function isChallenge(title, text) {
     if (challengeBefore) {
       const words = ops.parseHocrWords(beforeHocr);
       const idx = beforeHocr.indexOf('Verify');
-      const rawAround = idx >= 0 ? beforeHocr.slice(Math.max(0, idx - 180), idx + 120) : beforeHocr.slice(0, 300);
-      console.error('HOCR_AROUND', JSON.stringify(rawAround));
+
       const word = ops.findChallengeWord(words);
       const x = word ? Math.max(10, Math.round(word.x1 - Math.max(24, (word.x2 - word.x1) * 0.32))) : 160;
       const y = word ? Math.round((word.y1 + word.y2) / 2) : 320;
