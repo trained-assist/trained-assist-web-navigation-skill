@@ -221,14 +221,15 @@ const tools = {
        'OCR-строки и click {x,y}. Если OCR недоступен — кликает по типовой координате и корректно отмечает ocrAvailable=false. ' +
        'HTTP fallback остаётся через web_open + web_text, без выдумывания успеха.' +
        'Не решает кастомную капчу, NP challenges возможны; при повторном challenge — перейти на ручной headed pass.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        attempts: { type: 'number', description: 'Сколько попыток (1..3, по умолчанию 2).' },
-      },
-    },
-    handler: async ({ attempts } = {}) => {
-      try { return await ops.passChallenge({ attempts: Number(attempts) || 2 }); } catch (e) { return fail('web_pass_challenge', e); }
+     inputSchema: {
+       type: 'object',
+       properties: {
+         attempts: { type: 'number', description: 'Сколько попыток (1..3, по умолчанию 2).' },
+         headed: { type: 'boolean', description: 'Запустить в headed-режиме (для stealth/JS-challenge, по умолчанию false).' },
+       },
+     },
+     handler: async ({ attempts, headed } = {}) => {
+       try { return await ops.passChallenge({ attempts: Number(attempts) || 2, headed: Boolean(headed) }); } catch (e) { return fail('web_pass_challenge', e); }
     },
   },
 

@@ -27,7 +27,8 @@ jobs:
       - name: Run challenge smoke
         env:
           URLS: ${{ github.event.inputs.urls }}
-        run: node scripts/web-challenge-smoke.cjs
+          HEADED: '1'
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x800x24" node scripts/web-challenge-smoke.cjs
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
