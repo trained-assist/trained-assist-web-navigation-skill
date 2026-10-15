@@ -391,6 +391,7 @@ async function readPage(page, maxChars = DEFAULT_TEXT_CHARS, offset = 0) {
     totalChars: clean.totalChars,
     loginRequired: login.loginRequired,
     loginEvidence: login.reason,
+    challenge: /один момент|just a moment|cloudflare|security (check|verification)|performing security|verify you are human/i.test(`${await page.title().catch(() => '')} ${String(raw || '').slice(0, 1000)}`),
     controls: items.filter(i => i.visible).length,
     forms: items.filter(i => i.tag === 'form' || i.type === 'submit').length,
   };
@@ -1150,8 +1151,36 @@ async function httpFallback(url) {
   }
 }
 
+async function openResilient(url, { maxChars = DEFAULT_TEXT_CHARS, attempts = 2 } = {}) {
+  const first = await openUrl(url, { maxChars });
+  if (!first.ok) return first;
+  if (!first.challenge) return { ...first, strategy: 'open' };
+  const pass = await passChallenge({ attempts, headed: true });
+  if (!session) {
+    return { ok: pass.ok, challenge: pass.challenge, challengePassed: pass.challengePassed, url: first.url, title: first.title, strategy: 'challenge', ...pass };
+  }
+  const view = await readPage(session.page, maxChars);
+  return {
+    ok: !view.loginRequired && pass.ok,
+    challenge: pass.challenge,
+    challengePassed: pass.challengePassed,
+    strategy: 'pass-challenge',
+    url: view.url,
+    title: view.title,
+    text: view.text,
+    offset: view.offset,
+    nextOffset: view.nextOffset,
+    truncated: view.truncated,
+    totalChars: view.totalChars,
+    loginRequired: view.loginRequired,
+    loginEvidence: view.loginEvidence,
+    pass,
+  };
+}
+
 module.exports = {
   passChallenge,
+  openResilient,
   httpFallback,
   tesseractAvailable,
   INTERACTIVE_SELECTOR,
