@@ -65,6 +65,7 @@ function isChallenge(title, text) {
     const challengeAfter = isChallenge(titleAfter, afterOcr);
     results.push({
       url,
+      ocrBeforeSnippet: beforeOcr.slice(0,220),
       status,
       titleBefore,
       titleAfter,
