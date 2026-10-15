@@ -1196,6 +1196,7 @@ module.exports = {
   statePath,
   shotsDir,
   // internals kept for tests
+  humanLikeClick,
   parseHocrWords,
   isCloudflareChallenge,
   findChallengeWord,
