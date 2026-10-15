@@ -105,5 +105,3 @@ async function attemptVariant(variant) {
   }
   console.log(JSON.stringify(results, null, 2));
 })();
-EOF
-git add scripts && git commit -m "experiment: headed challenge variant matrix" && git push
