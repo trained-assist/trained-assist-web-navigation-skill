@@ -50,8 +50,44 @@ test('findCandidates and ambiguity are deterministic', () => {
   assert.equal(c[0].score, c[1].score);
 });
 
+test('query ranking can find icon controls by accessible names and supplied alternatives', () => {
+  const item = {
+    handle: '4', tag: 'a', role: 'link', text: '', label: '', placeholder: '',
+    name: '', id: '', href: '/oauth/github', ariaLabel: '', title: '',
+    alt: 'GitHub', context: 'Зайти через GitHub', visible: true, disabled: false,
+  };
+  const result = ops.rankQuery(item, ['войти через GitHub', 'Зайти через GitHub']);
+  assert.equal(result.score, 100);
+  assert.equal(result.matchedQuery, 'Зайти через GitHub');
+  assert.ok(ops.scoreMatch(item, { text: 'GitHub' }) > 0);
+});
+
+test('query token normalization handles Russian ё and punctuation', () => {
+  assert.deepEqual(ops.queryTokens('Войти через «личный кабинет»!'), ['войти', 'через', 'личный', 'кабинет']);
+  assert.deepEqual(ops.queryTokens('Ёлка / LOGIN'), ['елка', 'login']);
+});
+
+test('a headed MCP session stays headed across later tool calls', () => {
+  assert.equal(ops.requestedHeadless({}, { headless: false }, {}), false);
+  assert.equal(ops.requestedHeadless({}, { headless: true }, {}), true);
+  assert.equal(ops.requestedHeadless({ headless: true }, { headless: false }, {}), true);
+  assert.equal(ops.requestedHeadless({}, null, {}), true);
+  assert.equal(ops.requestedHeadless({}, null, { WEB_OPS_HEADED: '1' }), false);
+});
+
 test('tool text for empty result stays diagnostic', () => {
   const { emptyToolResultText } = require('../src/mcp-skills/tool-result');
   const text = emptyToolResultText('web_find');
   assert.match(text, /пустой результат/);
+});
+
+test('MCP tool result sends screenshot as image content without base64 in text', () => {
+  const { toolResultContent } = require('../src/mcp-skills/tool-result');
+  const content = toolResultContent('web_screenshot', {
+    ok: true, file: '/tmp/page.png', imageContent: { type: 'image', data: 'aGVsbG8=', mimeType: 'image/png' },
+  });
+  assert.equal(content.length, 2);
+  assert.match(content[0].text, /page\.png/);
+  assert.doesNotMatch(content[0].text, /aGVsbG8=/);
+  assert.deepEqual(content[1], { type: 'image', data: 'aGVsbG8=', mimeType: 'image/png' });
 });
