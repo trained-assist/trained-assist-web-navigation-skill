@@ -222,14 +222,20 @@ const tools = {
     },
   },
 
-  web_current_page: {
+  web_state: {
     description:
-      'Что СЕЙЧАС открыто в браузере: адрес, заголовок, нужен ли вход, короткий текст. ' +
-      'Используй, чтобы ответить «ты уже вошёл?» или «какая страница открыта» без нового обхода сайта. ' +
-      'Это чтение текущего состояния, а НЕ выдача ссылки на вход — для ссылки на удалённый логин используй browser_session_remote_url.',
-    inputSchema: { type: 'object', properties: {} },
-    handler: async () => {
-      try { return await ops.pageState(); } catch (e) { return fail('web_current_page', e); }
+      'Краткий статус открытой страницы в Markdown: адрес, заголовок, вход/ограничения и ключевые контролы. ' +
+      'scope (строка или handle) возвращает ограниченную область вокруг элемента/раздела вместо всей страницы. ' +
+      'Используй для расширения контекста после web_open/web_find, а не для нового обхода сайта.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        scope: { type: 'string', description: 'Необязательный запрос или handle: вернуть локальный фрагмент вокруг элемента/раздела.' },
+        max_chars: { type: 'number', description: 'Сколько символов текста учитывать (по умолчанию 1200).' },
+      },
+    },
+    handler: async ({ scope, max_chars } = {}) => {
+      try { return await ops.state({ scope: scope || null, maxChars: Number(max_chars) || 1200 }); } catch (e) { return fail('web_state', e); }
     },
   },
 

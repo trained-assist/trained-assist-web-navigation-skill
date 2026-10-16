@@ -19,6 +19,9 @@ function toolResultText(name, result, { pretty = true } = {}) {
     return emptyToolResultText(name);
   }
   if (typeof result === 'string') return result;
+  if (result && typeof result === 'object' && typeof result.markdown === 'string' && result.markdown.trim()) {
+    return result.markdown;
+  }
   return pretty ? JSON.stringify(result, null, 2) : JSON.stringify(result);
 }
 module.exports = { isEmptyToolResult, emptyToolResultText, toolResultText };
