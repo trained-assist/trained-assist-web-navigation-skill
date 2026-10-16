@@ -129,9 +129,9 @@ const tools = {
         include_hidden: { type: 'boolean', description: 'Включить невидимые элементы (по умолчанию false).' },
       },
     },
-    handler: async ({ query, alternatives, limit, include_hidden } = {}) => {
+    handler: async ({ query, alternatives, limit, include_hidden } = {}, context = {}) => {
       try {
-        return await ops.findOnPage({ query, alternatives, limit: Number(limit) || undefined, includeHidden: Boolean(include_hidden) });
+        return await ops.findOnPage({ query, alternatives, limit: Number(limit) || undefined, includeHidden: Boolean(include_hidden), signal: context.signal });
       } catch (e) { return fail('web_find', e); }
     },
   },

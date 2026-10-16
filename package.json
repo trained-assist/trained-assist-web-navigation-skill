@@ -5,7 +5,7 @@
   "description": "Web navigation domain skill (web_* open/find/click/fill/login/state/screenshot) \u2014 MCP server mounted by trained-assist-agent as the web-navigation-skills sibling",
   "main": "src/mcp-skills/index.js",
   "scripts": {
-    "check": "node -e \"require('fs').readdirSync('src/mcp-skills/tools').forEach(f => require('./src/mcp-skills/tools/'+f))\" && node --check src/mcp-skills/index.js && node --check src/web-ops.js && node --check src/host-provider.js",
+    "check": "node -e \"require('fs').readdirSync('src/mcp-skills/tools').forEach(f => require('./src/mcp-skills/tools/'+f))\" && node --check src/mcp-skills/index.js && node --check src/web-ops.js && node --check src/host-provider.js && node --check src/semantic-search.js",
     "test": "node --test tests/*.test.cjs"
   },
   "engines": {
