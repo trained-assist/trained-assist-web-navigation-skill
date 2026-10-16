@@ -11,7 +11,7 @@ test('host provider exposes web navigation tools with pinned version', () => {
   assert.equal(provider.version, VERSION);
   assert.deepEqual(provider.tools.map(t => t.name), [
     'web_open', 'web_open_resilient', 'web_text', 'web_ask', 'web_find', 'web_click',
-    'web_fill', 'web_login', 'web_current_page', 'web_pass_challenge', 'web_screenshot'
+    'web_fill', 'web_login', 'web_state', 'web_pass_challenge', 'web_screenshot'
   ]);
   assert.equal(typeof provider.tools[0].handler, 'function');
 });
