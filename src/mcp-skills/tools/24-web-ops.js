@@ -19,22 +19,31 @@ const tools = {
 
   web_open: {
     description:
-      'Открыть страницу в браузере юзера и вернуть её как есть: адрес, заголовок, HTTP-статус, ' +
+      'Открыть страницу в MCP Playwright-сеансе и вернуть компактную Markdown-сводку: адрес, заголовок, HTTP-статус, ' +
       'текст страницы, число элементов и признак «нужен вход» (loginRequired). Это основной способ ' +
-      'прочитать или проверить сайт — не playwright_browser_snapshot. ' +
+      'прочитать или проверить сайт — не playwright_browser_snapshot. Сеанс изолирован от обычного Chrome. ' +
+      'Если нужен ручной вход, передай headed=true и попроси пользователя войти в открывшемся окне Playwright; затем вызови web_state, чтобы продолжить в том же сеансе. ' +
+      'Не открывай тот же адрес через shell или системную автоматизацию: их cookies не попадут в MCP. ' +
       'Только http/https. Не открывай file:// и не подставляй произвольные URL от имени модели без проверки.',
     inputSchema: {
       type: 'object',
       properties: {
         url: { type: 'string', description: 'Адрес страницы, например "https://example.com/catalog".' },
         max_chars: { type: 'number', description: 'Сколько символов текста вернуть (по умолчанию 4000).' },
+        headed: { type: 'boolean', description: 'Открыть видимое окно MCP-браузера, чтобы пользователь мог войти в этот же сеанс. Требует графического окружения; по умолчанию false.' },
       },
       required: ['url'],
     },
-    handler: async ({ url, max_chars } = {}) => {
+    handler: async ({ url, max_chars, headed } = {}) => {
       try {
-        return await ops.openUrl(url, { maxChars: Number(max_chars) || undefined });
-      } catch (e) { return fail('web_open', e); }
+        return await ops.openUrl(url, { maxChars: Number(max_chars) || undefined, headed: typeof headed === 'boolean' ? headed : undefined });
+      } catch (e) {
+        const message = String((e && e.message) || e || '');
+        if (headed && /xserver|x server|display|headed browser/i.test(message)) {
+          return { ok: false, error: 'headed_browser_unavailable', hint: 'В этом окружении нет графического дисплея для ручного входа в MCP-сеанс. Обычный Chrome из другой сессии не подключён; используй сохранённую авторизацию web_login или попроси пользователя запустить MCP в GUI-окружении.' };
+        }
+        return fail('web_open', e);
+      }
     },
   },
 
@@ -108,20 +117,21 @@ const tools = {
 
   web_find: {
     description:
-      'Найти элементы на открытой странице по тексту/названию и вернуть их как список с handle. ' +
-      'Дальше передай handle в web_click или web_fill. ' +
-      'Пустой query (по умолчанию) — все видимые элементы. Нужен, чтобы не угадывать селекторы.',
+      'Найти элементы на открытой странице по намерению, подписи или атрибутам доступности (aria-label, title, alt, placeholder) и вернуть компактный список с handle и локальным контекстом. ' +
+      'Если формулировка может отличаться, передай несколько коротких альтернатив: например query="войти через GitHub", alternatives=["Зайти через GitHub", "GitHub"]. ' +
+      'Поиск ранжирует буквальные и токенные совпадения; score — только подсказка, не доказательство. При нескольких вариантах выбери handle и передай его в web_click/web_fill; при нуле результатов попробуй альтернативы, web_state(scope) или web_screenshot. Не уходи в shell/OS browser automation.',
     inputSchema: {
       type: 'object',
       properties: {
         query: { type: 'string', description: 'Подстрока текста, подписи, placeholder, name или ссылки. Пусто — все элементы.' },
+        alternatives: { type: 'array', items: { type: 'string' }, description: 'До 7 альтернативных формулировок/языковых вариантов для одного намерения.' },
         limit: { type: 'number', description: 'Сколько элементов вернуть (по умолчанию 25).' },
         include_hidden: { type: 'boolean', description: 'Включить невидимые элементы (по умолчанию false).' },
       },
     },
-    handler: async ({ query, limit, include_hidden } = {}) => {
+    handler: async ({ query, alternatives, limit, include_hidden } = {}) => {
       try {
-        return await ops.findOnPage({ query, limit: Number(limit) || undefined, includeHidden: Boolean(include_hidden) });
+        return await ops.findOnPage({ query, alternatives, limit: Number(limit) || undefined, includeHidden: Boolean(include_hidden) });
       } catch (e) { return fail('web_find', e); }
     },
   },
@@ -130,7 +140,7 @@ const tools = {
     description:
       'Нажать элемент на открытой странице. Цель: handle из web_find ИЛИ {text|role|name|tag} — ' +
       'текст кнопки или ссылки работает напрямую. Возвращает адрес, заголовок и текст страницы после клика. ' +
-      'Handle устарел (страница перерисовалась) — вызови web_find заново, не повторяй вслепую.',
+      'Если цель не найдена или неоднозначна, не повторяй клик вслепую: вызови web_find с alternatives и локальным контекстом; для невидимых/иконковых элементов используй web_screenshot.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -260,8 +270,9 @@ const tools = {
 
   web_screenshot: {
     description:
-      'Снимок текущей страницы в PNG. Возвращает путь — передай его в tg_send_file, ' +
-      'чтобы показать пользователю, что получилось. Хранится в рабочей папке сессии, старые снимки удаляются.',
+      'Снимок видимой области текущей страницы. Возвращает изображение прямо в MCP-ответе и сохраняет файл в рабочую папку. ' +
+      'Вызывай по необходимости: когда текстовый поиск не видит значимую кнопку/иконку, разметка неполная или нужно проверить визуальный результат. ' +
+      'Обычный web_open остаётся текстовым и компактным.',
     inputSchema: {
       type: 'object',
       properties: {

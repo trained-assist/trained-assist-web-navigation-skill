@@ -24,4 +24,16 @@ function toolResultText(name, result, { pretty = true } = {}) {
   }
   return pretty ? JSON.stringify(result, null, 2) : JSON.stringify(result);
 }
-module.exports = { isEmptyToolResult, emptyToolResultText, toolResultText };
+
+function toolResultContent(name, result) {
+  const image = result && result.imageContent;
+  const visibleResult = image ? { ...result } : result;
+  if (image) delete visibleResult.imageContent;
+  const content = [{ type: 'text', text: toolResultText(name, visibleResult) }];
+  if (image && image.type === 'image' && typeof image.data === 'string' && typeof image.mimeType === 'string') {
+    content.push(image);
+  }
+  return content;
+}
+
+module.exports = { isEmptyToolResult, emptyToolResultText, toolResultText, toolResultContent };

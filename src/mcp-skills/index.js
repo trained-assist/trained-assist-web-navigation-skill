@@ -7,7 +7,7 @@
 
 const readline = require('readline');
 const registry = require('./registry.js');
-const { toolResultText } = require('./tool-result.js');
+const { toolResultContent } = require('./tool-result.js');
 
 const rl = readline.createInterface({ input: process.stdin, terminal: false });
 
@@ -50,8 +50,7 @@ rl.on('line', async (line) => {
       const { name, arguments: args } = params || {};
       const result = await registry.callTool(name, args || {});
       // agent#1481: never hand the model an empty text — see tool-result.js
-      const text = toolResultText(name, result);
-      respond(id, { content: [{ type: 'text', text }] });
+      respond(id, { content: toolResultContent(name, result) });
 
     } else {
       respondError(id, -32601, `Method not found: ${method}`);
