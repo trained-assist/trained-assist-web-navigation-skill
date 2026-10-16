@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "trained-assist-web-semantic-search",
+  "main": "workers/semantic-search.js",
+  "compatibility_date": "2026-10-16",
+  "workers_dev": true,
+  "ai": { "binding": "AI" },
+  "observability": { "enabled": false },
+  "limits": { "cpu_ms": 1000 }
+}

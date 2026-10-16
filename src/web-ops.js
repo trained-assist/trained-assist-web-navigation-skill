@@ -24,6 +24,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
+const semanticSearch = require('./semantic-search');
 
 const VIEWPORT = { width: 1280, height: 800 };
 const NAV_TIMEOUT_MS = 30_000;
@@ -588,7 +589,7 @@ function rankQuery(item, queries) {
   return { score: best, matchedQuery };
 }
 
-async function findOnPage({ query = '', alternatives = [], limit = DEFAULT_FIND_LIMIT, includeHidden = false }) {
+async function findOnPage({ query = '', alternatives = [], limit = DEFAULT_FIND_LIMIT, includeHidden = false, signal } = {}) {
   return serialize(async () => {
     const page = await currentPage();
     const items = await collectItems(page);
@@ -596,10 +597,29 @@ async function findOnPage({ query = '', alternatives = [], limit = DEFAULT_FIND_
     const pool = includeHidden ? items : items.filter(i => i.visible);
     const queries = [query, ...(Array.isArray(alternatives) ? alternatives : [])]
       .map(value => String(value || '').trim()).filter(Boolean).slice(0, 8);
-    const ranked = queries.length
+    let ranked = queries.length
       ? pool.map(item => ({ item, ...rankQuery(item, queries) })).filter(row => row.score > 0)
         .sort((a, b) => b.score - a.score || Number(b.item.visible) - Number(a.item.visible))
       : pool.map(item => ({ item, score: 0, matchedQuery: '' }));
+    let semanticUsed = false;
+    const endpoint = process.env.WEB_NAV_SEMANTIC_ENDPOINT || '';
+    if (queries.length && ranked.length < 3 && endpoint) {
+      try {
+        const payload = semanticSearch.buildPayload(query, alternatives, pool);
+        const matches = await semanticSearch.semanticRank(payload, {
+          endpoint,
+          accessClientId: process.env.WEB_NAV_ACCESS_CLIENT_ID,
+          accessClientSecret: process.env.WEB_NAV_ACCESS_CLIENT_SECRET,
+          signal,
+        });
+        if (matches && matches.length) {
+          const byIndex = new Map(pool.map(item => [Number(item.handle), item]));
+          const semantic = matches.map(match => ({ item: byIndex.get(match.index), score: Math.round(match.score * 100), matchedQuery: query || alternatives[0] || '', semantic: true }))
+            .filter(row => row.item && !ranked.some(existing => existing.item.handle === row.item.handle));
+          if (semantic.length) { ranked = [...ranked, ...semantic].sort((a, b) => b.score - a.score); semanticUsed = true; }
+        }
+      } catch { /* Semantic fallback is best-effort; local matches remain available. */ }
+    }
     const matched = ranked.map(row => row.item);
     const shown = ranked.slice(0, Math.max(1, Math.min(Number(limit) || DEFAULT_FIND_LIMIT, 50)));
     const lines = [];
@@ -612,7 +632,7 @@ async function findOnPage({ query = '', alternatives = [], limit = DEFAULT_FIND_
         const i = row.item;
         const label = escapeMarkdown(i.text || i.label || i.ariaLabel || i.alt || i.title || i.placeholder || i.name || i.id || i.tag);
         const detail = [i.ariaLabel, i.title, i.alt, i.context].filter(Boolean).join(' · ');
-        lines.push(`- ${controlPrefix(i)} «${label}» [ref: ${i.handle}]${detail ? ` — ${escapeMarkdown(detail.slice(0, 180))}` : ''}${row.score ? ` _(совпадение ${row.score}%)_` : ''}`);
+        lines.push(`- ${controlPrefix(i)} «${label}» [ref: ${i.handle}]${detail ? ` — ${escapeMarkdown(detail.slice(0, 180))}` : ''}${row.score ? ` _(совпадение ${row.score}%${row.semantic ? ', семантическое' : ''})_` : ''}`);
       }
       if (matched.length > shown.length) lines.push(`… показано ${shown.length} из ${matched.length}.`);
     } else {
@@ -627,6 +647,7 @@ async function findOnPage({ query = '', alternatives = [], limit = DEFAULT_FIND_
       url: page.url(),
       title: await page.title().catch(() => ''),
       query,
+      semanticUsed,
       count: matched.length,
       items: shown.map(({ item: i, score, matchedQuery }) => ({
         handle: i.handle, tag: i.tag, type: i.type, role: i.role, name: i.name,
